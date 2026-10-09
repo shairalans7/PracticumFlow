@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PracticumFlow - OJT Tracker System</title>
+  <!-- Tailwind CSS & Chart.js CDNs -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
+
+  <!-- ================= AUTHENTICATION CONTAINER (LOGIN / REGISTER) ================= -->
+  <div id="authContainer" class="flex min-h-screen items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md p-8">
+      <div class="text-center mb-6">
+        <h1 class="text-2xl font-bold text-[#0F265C]">PracticumFlow</h1>
+        <p class="text-xs text-slate-500 mt-1">OJT Internship Student Portal</p>
+      </div>
+
+      <!-- Auth Error / Success Alert -->
+      <div id="authAlert" class="hidden mb-4 p-3 rounded-lg text-xs font-medium"></div>
+
+      <!-- Auth Form -->
+      <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address</label>
+          <input id="authEmail" type="email" required placeholder="student@university.edu" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Password</label>
+          <input id="authPassword" type="password" required placeholder="••••••••" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Registration Only Fields -->
+        <div id="registerFields" class="hidden space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+            <input id="regFullName" type="text" placeholder="Shaira Meriz Lansangan" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Course / Major</label>
+            <input id="regCourse" type="text" placeholder="BS Information Technology" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Company Name</label>
+            <input id="regCompany" type="text" placeholder="TechFlow Solutions Inc." class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Total Required Practicum Hours</label>
+            <input id="regTargetHours" type="number" value="243" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm">
+          </div>
+        </div>
+
+        <button id="authSubmitBtn" type="submit" class="w-full py-3 bg-[#0F265C] text-white rounded-lg font-semibold text-sm hover:bg-blue-900 transition-colors shadow">
+          Sign In
+        </button>
+      </form>
+
+      <div class="mt-4 text-center">
+        <button onclick="toggleAuthMode()" id="authToggleBtn" class="text-xs text-blue-600 font-semibold hover:underline">
+          Don't have an account? Register here
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= DASHBOARD APP CONTAINER ================= -->
+  <div id="appContainer" class="hidden flex min-h-screen">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-[#0F265C] text-white p-6 flex flex-col justify-between flex-shrink-0">
+      <div>
+        <div class="mb-8">
+          <h1 class="text-xl font-bold">PracticumFlow</h1>
+          <p class="text-xs text-slate-300">OJT Internship Tracker</p>
+        </div>
+        
+        <nav class="space-y-2">
+          <a href="#" class="block px-4 py-2 bg-white text-[#0F265C] rounded-lg font-semibold text-sm">Dashboard</a>
+          <a href="#" class="block px-4 py-2 text-slate-300 hover:bg-white/10 rounded-lg text-sm">Activity Logs</a>
+          <a href="#" class="block px-4 py-2 text-slate-300 hover:bg-white/10 rounded-lg text-sm">Analytics</a>
+        </nav>
+      </div>
+
+      <!-- Authenticated User Profile Summary -->
+      <div class="border-t border-white/10 pt-4">
+        <p id="userDisplayName" class="text-sm font-semibold">Student Name</p>
+        <p id="userDisplayRole" class="text-xs text-slate-300">Student Intern</p>
+        <button onclick="handleSignOut()" class="mt-3 text-xs bg-red-500/20 text-red-300 hover:bg-red-500/30 px-3 py-1.5 rounded w-full text-left font-medium">
+          ← Sign Out
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 p-8 overflow-y-auto">
+      
+      <!-- Top Header -->
+      <div class="flex justify-between items-center mb-6">
+        <div>
+          <h2 class="text-2xl font-bold text-slate-900">Dashboard</h2>
+          <p id="realtimeDate" class="text-xs text-slate-500"></p>
+        </div>
+        <button onclick="openLogModal()" class="bg-[#0F265C] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-900 shadow">
+          + Add Activity Log
+        </button>
+      </div>
+
+      <!-- CORE FEATURE 1: Time Tracker Card -->
+      <div class="bg-[#112A66] rounded-2xl p-6 text-white mb-6 shadow flex justify-between items-center">
+        <div>
+          <p id="shiftStatus" class="text-xs text-amber-300 mb-1">Start your shift today</p>
+          <div id="timerDisplay" class="text-4xl font-mono font-bold mb-1">00:00:00</div>
+          <p id="lastClockText" class="text-xs text-slate-300">Last clock-in: Not started today</p>
+        </div>
+        <button id="clockBtn" onclick="toggleClock()" class="bg-blue-500 hover:bg-blue-600 px-6 py-3 rounded-xl font-medium text-sm shadow">
+          Clock In
+        </button>
+      </div>
+
+      <!-- Hours Completed Card -->
+      <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow mb-6">
+        <div class="mb-2">
+          <h3 class="font-bold text-slate-900 text-sm">Hours completed</h3>
+          <p class="text-xs text-slate-400">Overall requirement</p>
+        </div>
+        <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden mb-2">
+          <div id="progressBar" class="bg-blue-600 h-full w-0 transition-all duration-300"></div>
+        </div>
+        <div class="text-xs text-slate-600 font-semibold">
+          <span id="hoursCalculationText">0 of 243 hours</span>
+          <span id="remainingCalculationText" class="text-slate-400 font-normal ml-2">(0% complete • 243h remaining)</span>
+        </div>
+      </div>
+
+      <!-- Grid for Activity Feed & Pie Chart Competency Analytics -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- CORE FEATURE 2: Structured Activity Log Feed -->
+        <div class="lg:col-span-2 bg-white rounded-2xl p-6 border border-slate-200 shadow">
+          <h3 class="font-semibold text-slate-900 mb-4">Recent activities</h3>
+          <div id="logsContainer" class="space-y-3">
+            <p class="text-xs text-slate-400">Loading activity logs...</p>
+          </div>
+        </div>
+
+        <!-- CORE FEATURE 3: Competency Mapping Pie Chart -->
+        <div class="bg-white rounded-2xl p-6 border border-slate-200 shadow flex flex-col items-center">
+          <h3 class="font-semibold text-slate-900 mb-1 w-full text-left">Competency Mapping Chart</h3>
+          <p class="text-xs text-slate-400 mb-4 w-full text-left">Based on task categories</p>
+          <div class="w-full max-w-[220px]">
+            <canvas id="competencyChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal for Adding Activity Logs -->
+  <div id="logModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
+      <h3 class="text-lg font-bold text-slate-900 mb-4">Add activity log</h3>
+      
+      <label class="block text-xs font-semibold mb-1">Task Type</label>
+      <select id="taskCategory" class="w-full p-2 border rounded-lg text-sm mb-3">
+        <option value="Technical">Technical</option>
+        <option value="Teamwork">Teamwork</option>
+        <option value="Communication">Communication</option>
+        <option value="Software">Software</option>
+        <option value="Coding">Coding</option>
+      </select>
+
+      <label class="block text-xs font-semibold mb-1">Hours Spent</label>
+      <input id="taskHours" type="number" min="0.5" step="0.5" value="4" class="w-full p-2 border rounded-lg text-sm mb-3">
+
+      <label class="block text-xs font-semibold mb-1">Description / Notes</label>
+      <textarea id="taskDesc" rows="3" placeholder="Add specific notes about work done..." class="w-full p-2 border rounded-lg text-sm mb-4"></textarea>
+
+      <div class="flex justify-end gap-2">
+        <button onclick="closeLogModal()" class="px-4 py-2 text-xs text-slate-600">Cancel</button>
+        <button onclick="saveLog()" class="px-4 py-2 text-xs bg-[#0F265C] text-white rounded-lg">Save Activity</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPLICATION JAVASCRIPT SYSTEM LOGIC -->
+  <script>
+    // 1. INITIALIZE SUPABASE CLIENT (Replace with your actual keys)
+    const SUPABASE_URL = 'https://djpmjfcoptakncasjrqr.supabase.co/rest/v1/';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqcG1qZmNvcHRha25jYXNqcnFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1NTI2MzUsImV4cCI6MjEwNzEyODYzNX0.HxkpnWp4Ems0CWgYYzFkMSzyu5D3HqDVZp5OVLyA35g';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // 2. STATE VARIABLES
+    let isRegisterMode = false;
+    let currentUser = null;
+    let userProfile = null;
+    let isClockedIn = false;
+    let timerInterval = null;
+    let elapsedSeconds = 0;
+    let activityLogs = [];
+    let myChart = null;
+
+    // 3. REAL-TIME DATE HEADER
+    document.getElementById('realtimeDate').innerText = new Date().toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+
+    // 4. AUTHENTICATION HANDLERS
+    function toggleAuthMode() {
+      isRegisterMode = !isRegisterMode;
+      document.getElementById('registerFields').classList.toggle('hidden', !isRegisterMode);
+      document.getElementById('authSubmitBtn').innerText = isRegisterMode ? 'Register Account' : 'Sign In';
+      document.getElementById('authToggleBtn').innerText = isRegisterMode ? 'Already have an account? Sign In' : "Don't have an account? Register here";
+    }
+
+    async function handleAuth(e) {
+      e.preventDefault();
+      const email = document.getElementById('authEmail').value;
+      const password = document.getElementById('authPassword').value;
+      const alertBox = document.getElementById('authAlert');
+
+      alertBox.classList.add('hidden');
+
+      if (isRegisterMode) {
+        const fullName = document.getElementById('regFullName').value;
+        const course = document.getElementById('regCourse').value;
+        const company = document.getElementById('regCompany').value;
+        const targetHours = Number(document.getElementById('regTargetHours').value);
+
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) return showAlert(error.message, 'error');
+
+        // Create Profile Row in Database
+        await supabase.from('profiles').insert([{
+          id: data.user.id, full_name: fullName, course, company_name: company, target_hours: targetHours
+        }]);
+
+        showAlert('Registration successful! Please sign in.', 'success');
+        toggleAuthMode();
+      } else {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) return showAlert(error.message, 'error');
+        
+        initDashboard(data.user);
+      }
+    }
+
+    function showAlert(msg, type) {
+      const alertBox = document.getElementById('authAlert');
+      alertBox.innerText = msg;
+      alertBox.className = `mb-4 p-3 rounded-lg text-xs font-medium ${type === 'error' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`;
+    }
+
+    async function handleSignOut() {
+      await supabase.auth.signOut();
+      location.reload();
+    }
+
+    // 5. DASHBOARD DATA LOADER
+    async function initDashboard(user) {
+      currentUser = user;
+      document.getElementById('authContainer').classList.add('hidden');
+      document.getElementById('appContainer').classList.remove('hidden');
+
+      // Fetch Profile
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      userProfile = profile || { full_name: 'Student Intern', target_hours: 243 };
+
+      document.getElementById('userDisplayName').innerText = userProfile.full_name;
+
+      // Fetch Logs
+      await fetchLogs();
+    }
+
+    async function fetchLogs() {
+      const { data: logs } = await supabase.from('activity_logs').select('*').eq('user_id', currentUser.id).order('id', { ascending: false });
+      activityLogs = logs || [];
+      renderDashboard();
+    }
+
+    // 6. CORE FEATURE 1: SMART TIME TRACKER
+    function toggleClock() {
+      const clockBtn = document.getElementById('clockBtn');
+      const shiftStatus = document.getElementById('shiftStatus');
+      const lastClockText = document.getElementById('lastClockText');
+
+      if (!isClockedIn) {
+        isClockedIn = true;
+        clockBtn.innerText = 'Clock Out';
+        clockBtn.className = 'bg-red-500 hover:bg-red-600 px-6 py-3 rounded-xl font-medium text-sm shadow';
+        shiftStatus.innerText = 'Active Shift Running';
+        shiftStatus.className = 'text-xs text-emerald-400 font-semibold';
+        lastClockText.innerText = `Clocked in at: ${new Date().toLocaleTimeString()}`;
+
+        timerInterval = setInterval(() => {
+          elapsedSeconds++;
+          const hrs = String(Math.floor(elapsedSeconds / 3600)).padStart(2, '0');
+          const mins = String(Math.floor((elapsedSeconds % 3600) / 60)).padStart(2, '0');
+          const secs = String(elapsedSeconds % 60).padStart(2, '0');
+          document.getElementById('timerDisplay').innerText = `${hrs}:${mins}:${secs}`;
+        }, 1000);
+      } else {
+        isClockedIn = false;
+        clearInterval(timerInterval);
+        clockBtn.innerText = 'Clock In';
+        clockBtn.className = 'bg-blue-500 hover:bg-blue-600 px-6 py-3 rounded-xl font-medium text-sm shadow';
+        shiftStatus.innerText = 'Start your shift today';
+        shiftStatus.className = 'text-xs text-amber-300';
+        
+        const lastTime = new Date().toLocaleTimeString();
+        lastClockText.innerText = `Last clocked out at: ${lastTime}`;
+
+        // Auto Save Shift Hours to Database
+        const hoursLogged = Math.max(0.5, Math.round((elapsedSeconds / 3600) * 10) / 10);
+        supabase.from('activity_logs').insert([{
+          user_id: currentUser.id, task_type: 'Technical', duration_hours: hoursLogged, description: `Automated shift session log (${lastTime}).`
+        }]).then(() => fetchLogs());
+
+        elapsedSeconds = 0;
+        document.getElementById('timerDisplay').innerText = '00:00:00';
+      }
+    }
+
+    // 7. CORE FEATURE 2: STRUCTURED ACTIVITY LOG MODAL
+    function openLogModal() { document.getElementById('logModal').classList.remove('hidden'); }
+    function closeLogModal() { document.getElementById('logModal').classList.add('hidden'); }
+
+    async function saveLog() {
+      const task_type = document.getElementById('taskCategory').value;
+      const duration_hours = Number(document.getElementById('taskHours').value);
+      const description = document.getElementById('taskDesc').value;
+
+      if (!description) return alert('Please enter notes.');
+
+      await supabase.from('activity_logs').insert([{
+        user_id: currentUser.id, task_type, duration_hours, description
+      }]);
+
+      document.getElementById('taskDesc').value = '';
+      closeLogModal();
+      fetchLogs();
+    }
+
+    // 8. RENDER DASHBOARD & CORE FEATURE 3: COMPETENCY PIE CHART
+    function renderDashboard() {
+      const targetHours = userProfile.target_hours || 243;
+      const totalCompleted = activityLogs.reduce((sum, log) => sum + Number(log.duration_hours), 0);
+      const percent = Math.min(100, Math.round((totalCompleted / targetHours) * 100));
+      const remaining = Math.max(0, targetHours - totalCompleted);
+
+      // Math Calculations
+      document.getElementById('hoursCalculationText').innerText = `${totalCompleted} of ${targetHours} hours`;
+      document.getElementById('remainingCalculationText').innerText = `(${percent}% complete • ${remaining}h remaining)`;
+      document.getElementById('progressBar').style.width = `${percent}%`;
+
+      // Render Feed
+      const logsContainer = document.getElementById('logsContainer');
+      logsContainer.innerHTML = activityLogs.length === 0 
+        ? '<p class="text-xs text-slate-400">No activity logs recorded yet.</p>'
+        : activityLogs.map(log => `
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+              <div class="flex justify-between font-semibold mb-1">
+                <span class="text-blue-600 font-bold">[${log.task_type}]</span>
+                <span class="text-slate-400">${log.duration_hours} hrs</span>
+              </div>
+              <p class="text-slate-700">${log.description}</p>
+            </div>
+          `).join('');
+
+      // Competency Pie Chart Rendering
+      const categories = ['Technical', 'Teamwork', 'Communication', 'Software', 'Coding'];
+      const categoryCounts = categories.map(cat => 
+        activityLogs.filter(l => l.task_type === cat).reduce((sum, l) => sum + Number(l.duration_hours), 0)
+      );
+
+      const ctx = document.getElementById('competencyChart').getContext('2d');
+      if (myChart) myChart.destroy();
+
+      myChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: categories,
+          datasets: [{
+            data: categoryCounts.every(val => val === 0) ? [1, 1, 1, 1, 1] : categoryCounts,
+            backgroundColor: ['#2563eb', '#6366f1', '#38bdf8', '#10b981', '#f59e0b']
+          }]
+        },
+        options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } } }
+      });
+    }
+  </script>
+</body>
+</html>
